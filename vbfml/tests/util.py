@@ -42,7 +42,7 @@ def create_test_tree(filename, treename, branches, n_events, value=None):
 
 
 def make_tmp_dir():
-    wdir = '/tmp/tmp_' + ''.join(random.choices(string.ascii_lowercase, k=32))
+    wdir = "/tmp/tmp_" + "".join(random.choices(string.ascii_lowercase, k=32))
     if os.path.exists(wdir):
         return make_tmp_dir()
     os.makedirs(wdir)

@@ -199,7 +199,7 @@ class TestMultiDatasetSequenceSplit(TestCase):
         self.files = []
         self.wdir = make_tmp_dir()
         self.addCleanup(os.rmdir, self.wdir)
-        
+
         self.mds = MultiDatasetSequence(
             batch_size=37, branches=self.branches, shuffle=False
         )

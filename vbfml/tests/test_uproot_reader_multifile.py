@@ -18,7 +18,7 @@ class TestUprootReaderMultiFile(TestCase):
         self.files = []
         self.wdir = make_tmp_dir()
         self.addCleanup(os.rmdir, self.wdir)
-        
+
         for i in range(self.n_file):
             fname = os.path.join(self.wdir, f"test_single_{i}.root")
 

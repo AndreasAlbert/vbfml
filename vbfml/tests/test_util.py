@@ -1,38 +1,32 @@
+import numpy as np
+import pandas as pd
 from unittest import TestCase
-from vbfml.util import LRIDictBuffer
+from vbfml.util import MultiBatchBuffer
 
 
-class TestLRIDictBuffer(TestCase):
+class TestMultiBatchBuffer(TestCase):
     def setUp(self):
-        self.buffer_size = 5
-        self.buffer = LRIDictBuffer(buffer_size=self.buffer_size)
-        self.test_items = {
-            "a": "b",
-            1: "c",
-            3: 4.5,
-            7: 8,
-            121231231: 129381023,
-            "sdajsld": 0,
-            -1: -0.5,
-        }
+        self.batch_size = 3
+        self.buffer = MultiBatchBuffer(batch_size=self.batch_size)
 
-    def test_buffer(self):
-        # Buffer initalizes empty
-        self.assertEqual(len(self.buffer), 0)
+        values = {}
 
-        forgotten_keys = []
-        for i, (key, value) in enumerate(self.test_items.items()):
+        self.n_rows = 10
+        values["a"] = np.array(range(self.n_rows))
+        values["b"] = np.array(range(self.n_rows, 2 * self.n_rows))
+        self.df = pd.DataFrame(values)
 
-            # Test insertion and read back
-            self.buffer[key] = value
-            expected_length = min(i + 1, self.buffer_size)
-            self.assertEqual(len(self.buffer), expected_length)
-            self.assertEqual(self.buffer[key], value)
+    def test_buffer_insertion(self):
+        offset = 5
+        self.buffer.set_multibatch(self.df, min_batch=offset)
 
-            # Store keys that will have been removed after loop
-            if i < len(self.test_items) - self.buffer_size:
-                forgotten_keys.append(key)
+        # Attempt to get non-existing batches
+        for index in range(offset):
+            self.assertFalse(index in self.buffer)
+            with self.assertRaises(IndexError):
+                self.buffer.get_batch_df(index)
 
-        # Test that early keys have really been removed
-        for key in forgotten_keys:
-            self.assertFalse(key in self.buffer)
+        for index in range(offset, offset + len(self.df) // self.batch_size):
+            self.assertTrue(index in self.buffer)
+            df = self.buffer.get_batch_df(index)
+            self.assertEqual(len(df.columns), len(self.df.columns))

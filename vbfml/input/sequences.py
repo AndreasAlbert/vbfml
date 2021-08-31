@@ -7,7 +7,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from tensorflow.keras.utils import Sequence, to_categorical
 
 from vbfml.input.uproot import UprootReaderMultiFile
-from vbfml.util import LRIDictBuffer
+from vbfml.util import MultiBatchBuffer
 
 
 @dataclass
@@ -47,8 +47,7 @@ class MultiDatasetSequence(Sequence):
         self.encoder = LabelEncoder()
 
         self.batch_buffer_size = batch_buffer_size
-        self.batch_buffer = LRIDictBuffer(buffer_size=self.batch_buffer_size)
-
+        self.buffer = MultiBatchBuffer(batch_size=self.batch_size)
         self._read_range = read_range
         self._weight_expression = weight_expression
 
@@ -74,7 +73,7 @@ class MultiDatasetSequence(Sequence):
     @scale_features.setter
     def scale_features(self, scale_features: bool) -> None:
         if scale_features != self.scale_features:
-            self.batch_buffer.clear()
+            self.buffer.clear()
         self._scale_features = scale_features
 
     @property
@@ -102,7 +101,7 @@ class MultiDatasetSequence(Sequence):
         # Buffered batches must be thrown out
         # if read range changes
         if read_range != self.read_range:
-            self.batch_buffer.clear()
+            self.buffer.clear()
 
         self._read_range = read_range
 
@@ -112,7 +111,7 @@ class MultiDatasetSequence(Sequence):
         """
         self._feature_scaler = StandardScaler().fit(features)
 
-    def _init_feature_scaler_from_multibatch(self, dfs: "list[pd.DataFrame]") -> None:
+    def _init_feature_scaler_from_multibatch(self, df: "pd.DataFrame") -> None:
         """
         Initialize the feature scaler object based on a list of DataFrames
 
@@ -120,7 +119,6 @@ class MultiDatasetSequence(Sequence):
         (i.e. many batches) rather than just a single batch. Higher
         statistiscal accuracy will result in better scaling performance.
         """
-        df = pd.concat(dfs)
         features = df.drop(columns=self._non_feature_columns()).to_numpy()
         self._init_feature_scaler_from_features(features)
 
@@ -149,6 +147,10 @@ class MultiDatasetSequence(Sequence):
                 self._format_weights(df, name)
             dataframes.append(df)
         return dataframes
+
+    def _read_multibatch(self, batch_start: int, batch_stop: int) -> pd.DataFrame:
+        dfs = self._read_dataframes_for_batch_range(batch_start, batch_stop)
+        return pd.concat(dfs, ignore_index=True)
 
     def _read_single_dataframe_for_batch_range(
         self, batch_start: int, batch_stop: int, dataset_name: str
@@ -217,44 +219,42 @@ class MultiDatasetSequence(Sequence):
         """
         Read batches from file and save them into the buffer for future use.
         """
-        multibatch_dfs = self._read_dataframes_for_batch_range(batch_start, batch_stop)
-
+        multibatch_df = self._read_multibatch(batch_start, batch_stop)
         if self.scale_features and not self._feature_scaler:
-            self._init_feature_scaler_from_multibatch(multibatch_dfs)
+            self._init_feature_scaler_from_multibatch(multibatch_df)
+        if self.shuffle:
+            multibatch_df = multibatch_df.sample(frac=1)
+        self.buffer.set_multibatch(multibatch_df, batch_start)
 
-        batched_dfs = self._split_multibatch(multibatch_dfs, index_offset=batch_start)
+    def _batch_df_formatting(self, df: pd.DataFrame) -> "tuple[np.ndarray]":
+        """Convert from a batch from pd.DataFrame to a tuple of np.ndarray for keras"""
 
-        for ibatch, dfs in batched_dfs.items():
-            if ibatch in self.batch_buffer:
-                continue
-            df = pd.concat(dfs)
+        features = df.drop(columns=self._non_feature_columns()).to_numpy()
+        if self.scale_features:
+            features = self.apply_feature_scaling(features)
 
-            if self.shuffle:
-                df = df.sample(frac=1)
+        labels = to_categorical(
+            row_vector(df["label"]),
+            num_classes=len(self.dataset_labels()),
+        )
 
-            features = df.drop(columns=self._non_feature_columns()).to_numpy()
-            if self.scale_features:
-                features = self.apply_feature_scaling(features)
+        if self.is_weighted():
+            weights = row_vector(df["weight"])
+            batch = (features, labels, weights)
+        else:
+            batch = (features, labels)
 
-            labels = to_categorical(
-                row_vector(df["label"]),
-                num_classes=len(self.dataset_labels()),
-            )
-
-            if self.is_weighted():
-                weights = row_vector(df["weight"])
-                batch = (features, labels, weights)
-            else:
-                batch = (features, labels)
-
-            self.batch_buffer[ibatch] = batch
+        return batch
 
     def __getitem__(self, batch: int) -> tuple:
         """Returns a single batch of data"""
-        if batch not in self.batch_buffer:
+        if batch not in self.buffer:
             max_batch_to_buffer = min(batch + self.batch_buffer_size, len(self))
             self._fill_batch_buffer(batch, max_batch_to_buffer)
-        return self.batch_buffer[batch]
+
+        batch_df = self.buffer.get_batch_df(batch)
+        batch = self._batch_df_formatting(batch_df)
+        return batch
 
     def add_dataset(self, dataset: DatasetInfo) -> None:
         """Add a new data set to the Sequence."""

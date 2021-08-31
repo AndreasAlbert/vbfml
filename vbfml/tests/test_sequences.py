@@ -106,8 +106,8 @@ class TestMultiDatasetSequence(TestCase):
             self.assertEqual(labels.shape[0], features.shape[0])
 
             # Batch size might vary slightly
-            self.assertTrue(features.shape[0] < self.batch_size * 1.25)
-            self.assertTrue(features.shape[0] > self.batch_size / 1.25)
+            self.assertTrue(features.shape[0] < self.batch_size * 1.5)
+            self.assertTrue(features.shape[0] > self.batch_size / 1.5)
 
             # Second index differs
             self.assertEqual(labels.shape[1], len(self.mds.datasets))

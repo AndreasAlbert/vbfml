@@ -1,25 +1,37 @@
 from dataclasses import dataclass
+import pandas as pd
 
 
 @dataclass
-class LRIDictBuffer(dict):
-    """
-    Least-recently-inserted buffered dictionary.
+class MultiBatchBuffer:
+    df: pd.DataFrame = None
+    batch_size: int = 1
+    min_batch: int = -1
+    max_batch: int = -1
 
-    A dictionary with fixed maximum size. If the maximum
-    size is reached and another insertion is made,
-    the oldest item is removed.
+    def set_multibatch(self, df: pd.DataFrame, min_batch: int):
+        self.df = df
+        self.min_batch = min_batch
+        self.max_batch = min_batch + len(df) // self.batch_size
 
-    Implementation relies on dict insertion ordering,
-    which is guaranteed since python 3.7.
-    """
+    def __contains__(self, batch_index):
+        if self.df is None:
+            return False
+        if not len(self.df):
+            return False
+        if batch_index < 0:
+            return False
+        return self.min_batch <= batch_index <= self.max_batch
 
-    buffer_size: int = 10
+    def clear(self):
+        self.df = None
+        self.min_batch = -1
+        self.max_batch = -1
 
-    def __setitem__(self, key, value):
-        dict.__setitem__(self, key, value)
-        if len(self) > self.buffer_size:
-            self.forget_oldest()
+    def get_batch_df(self, batch_index):
+        if not batch_index in self:
+            raise IndexError(f"Batch index '{batch_index}' not in current buffer.")
 
-    def forget_oldest(self):
-        self.pop(next(iter(self)))
+        row_start = batch_index - self.min_batch
+        row_stop = min(row_start + self.batch_size, len(self.df))
+        return self.df.loc[row_start:row_stop]

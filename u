@@ -1,0 +1,114 @@
+[1mdiff --cc vbfml/input/sequences.py[m
+[1mindex eec8614,c5c2b65..0000000[m
+[1m--- a/vbfml/input/sequences.py[m
+[1m+++ b/vbfml/input/sequences.py[m
+[36m@@@ -2,10 -3,9 +2,10 @@@[m [mfrom dataclasses import dataclas[m
+  [m
+  import numpy as np[m
+  import pandas as pd[m
+[31m- from sklearn.preprocessing import LabelEncoder[m
+[32m+ from sklearn.preprocessing import LabelEncoder, StandardScaler[m
+  from tensorflow.keras.utils import Sequence, to_categorical[m
+  [m
+[32m +from collections import defaultdict[m
+  from vbfml.input.uproot import UprootReaderMultiFile[m
+  from vbfml.util import LRIDictBuffer[m
+  [m
+[36m@@@ -29,6 -36,8 +29,11 @@@[m [mclass MultiDatasetSequence(Sequence)[m
+          shuffle=True,[m
+          batch_buffer_size=1,[m
+          read_range=(0.0, 1.0),[m
+[32m++<<<<<<< HEAD[m
+[32m++=======[m
+[32m+         weight_expression=None,[m
+[32m+         scale_features=False,[m
+[32m++>>>>>>> f2d532c... Implement optional feature scaling[m
+      ) -> None:[m
+          self.datasets = {}[m
+          self.readers = {}[m
+[36m@@@ -41,12 -50,34 +46,36 @@@[m
+          self.batch_buffer = LRIDictBuffer(buffer_size=self.batch_buffer_size)[m
+  [m
+          self._read_range = read_range[m
+[31m -        self._weight_expression = weight_expression[m
+  [m
+[32m+         self._scale_features = scale_features[m
+[32m+         self._feature_scaler = None[m
+[32m+ [m
+      def __len__(self) -> int:[m
+          read_fraction = self.read_range[1] - self.read_range[0][m
+          return int(self.total_events() * read_fraction // self.batch_size)[m
+  [m
+      @property[m
+[32m++<<<<<<< HEAD[m
+[32m++=======[m
+[32m+     def weight_expression(self) -> str:[m
+[32m+         return self._weight_expression[m
+[32m+ [m
+[32m+     @weight_expression.setter[m
+[32m+     def weight_expression(self, weight_expression: str) -> None:[m
+[32m+         self._weight_expression = weight_expression[m
+[32m+ [m
+[32m+     @property[m
+[32m+     def scale_features(self) -> bool:[m
+[32m+         return self._scale_features[m
+[32m+ [m
+[32m+     @scale_features.setter[m
+[32m+     def scale_features(self, scale_features: bool) -> None:[m
+[32m+         if scale_features != self.scale_features:[m
+[32m+             self.batch_buffer.clear()[m
+[32m+         self._scale_features = scale_features[m
+[32m+ [m
+[32m+     @property[m
+[32m++>>>>>>> f2d532c... Implement optional feature scaling[m
+      def shuffle(self) -> bool:[m
+          return self._shuffle[m
+  [m
+[36m@@@ -75,6 -106,22 +104,25 @@@[m
+  [m
+          self._read_range = read_range[m
+  [m
+[32m++<<<<<<< HEAD[m
+[32m++=======[m
+[32m+     def _init_feature_scaler(self, features: np.ndarray) -> None:[m
+[32m+         self._feature_scaler = StandardScaler().fit(features)[m
+[32m+ [m
+[32m+     def apply_feature_scaling(self, features: np.ndarray) -> np.ndarray:[m
+[32m+         if not self._feature_scaler:[m
+[32m+             self._init_feature_scaler(features)[m
+[32m+         return self._feature_scaler.transform(features)[m
+[32m+ [m
+[32m+     def _format_weights(self, df: pd.DataFrame, dataset_name: str) -> None:[m
+[32m+         dataset_weight = self.datasets[dataset_name].weight[m
+[32m+         if self.weight_expression:[m
+[32m+             df.rename(columns={self.weight_expression: "weight"}, inplace=True)[m
+[32m+             df["weight"] = df["weight"] * dataset_weight[m
+[32m+         else:[m
+[32m+             df["weight"] = dataset_weight[m
+[32m+ [m
+[32m++>>>>>>> f2d532c... Implement optional feature scaling[m
+      def _read_dataframes_for_batch_range([m
+          self, batch_start: int, batch_stop: int[m
+      ) -> list:[m
+[36m@@@ -148,9 -208,16 +196,20 @@@[m
+              if self.shuffle:[m
+                  df = df.sample(frac=1)[m
+  [m
+[32m++<<<<<<< HEAD[m
+[32m +            features = df.drop(columns="label").to_numpy()[m
+[32m++=======[m
+[32m+             non_feature_columns = ["label"][m
+[32m+             if self.is_weighted():[m
+[32m+                 non_feature_columns.append("weight")[m
+[32m+             features = df.drop(columns=non_feature_columns).to_numpy()[m
+[32m+ [m
+[32m+             if self.scale_features:[m
+[32m+                 features = self.apply_feature_scaling(features)[m
+[32m+ [m
+[32m++>>>>>>> f2d532c... Implement optional feature scaling[m
+              labels = to_categorical([m
+[31m -                row_vector(df["label"]),[m
+[32m +                np.array(df["label"]).reshape((len(df["label"]), 1)),[m
+                  num_classes=len(self.dataset_labels()),[m
+              )[m
+  [m

@@ -1,0 +1,6 @@
+ewk_znunu:
+  directory: "/media/nas/cms/nanopost/ML_11Jun21v7/EWKZ2Jets_ZToNuNu-mg_2017/210613_202029/0000/"
+  label: "ewkznn"
+vbfhinv:
+  directory: "/media/nas/cms/nanopost/ML_11Jun21v7/VBF_HToInvisible_M125_pow_pythia8_2017/210613_202316/0000/"
+  label: "vbfhinv"

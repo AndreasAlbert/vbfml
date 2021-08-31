@@ -3,7 +3,7 @@ from unittest import TestCase
 
 import numpy as np
 from vbfml.input.uproot import UprootReaderMultiFile
-from vbfml.tests.util import create_test_tree
+from vbfml.tests.util import create_test_tree, make_tmp_dir
 
 
 class TestUprootReaderMultiFile(TestCase):
@@ -16,8 +16,11 @@ class TestUprootReaderMultiFile(TestCase):
         self.values = list(range(self.n_file))
         self.total_events = self.nevents_per_file * self.n_file
         self.files = []
+        self.wdir = make_tmp_dir()
+        self.addCleanup(os.rmdir, self.wdir)
+        
         for i in range(self.n_file):
-            fname = os.path.abspath(f"test_single_{i}.root")
+            fname = os.path.join(self.wdir, f"test_single_{i}.root")
 
             create_test_tree(
                 filename=fname,

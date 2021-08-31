@@ -5,7 +5,7 @@ from unittest import TestCase
 import numpy as np
 from tensorflow.keras.utils import to_categorical
 from vbfml.input.sequences import DatasetInfo, MultiDatasetSequence
-from vbfml.tests.util import create_test_tree
+from vbfml.tests.util import create_test_tree, make_tmp_dir
 from vbfml.models import sequential_dense_model
 
 
@@ -22,14 +22,15 @@ class TestMultiDatasetSequence(TestCase):
         self.dataset = "dataset"
         self.files = []
         self.batch_size = 50
-
+        self.wdir = make_tmp_dir()
+        self.addCleanup(os.rmdir, self.wdir)
         self.mds = MultiDatasetSequence(
             batch_size=self.batch_size, branches=self.branches, shuffle=False
         )
 
         for i in range(self.n_datasets):
             name = f"dataset_{i}"
-            fname = os.path.abspath(f"test_{name}.root")
+            fname = os.path.join(self.wdir, f"test_{name}.root")
             create_test_tree(
                 filename=fname,
                 treename=self.treename,
@@ -196,12 +197,14 @@ class TestMultiDatasetSequenceSplit(TestCase):
         self.values = list(range(self.nevents_per_file))
         self.total_events = self.nevents_per_file
         self.files = []
-
+        self.wdir = make_tmp_dir()
+        self.addCleanup(os.rmdir, self.wdir)
+        
         self.mds = MultiDatasetSequence(
             batch_size=37, branches=self.branches, shuffle=False
         )
 
-        fname = os.path.abspath(f"test.root")
+        fname = os.path.abspath(os.path.join(self.wdir, "test.root"))
         create_test_tree(
             filename=fname,
             treename=self.treename,
@@ -258,8 +261,9 @@ class TestMultiDatasetSequenceWeight(TestCase):
             shuffle=False,
             weight_expression=self.weight_expression,
         )
-
-        fname = os.path.abspath(f"test.root")
+        self.wdir = make_tmp_dir()
+        self.addCleanup(os.rmdir, self.wdir)
+        fname = os.path.abspath(os.path.join(self.wdir, "test.root"))
         create_test_tree(
             filename=fname,
             treename=self.treename,
@@ -359,7 +363,9 @@ class TestMultiDatasetSequenceFeatureScaling(TestCase):
             weight_expression=self.weight_expression,
         )
 
-        fname = os.path.abspath(f"test.root")
+        self.wdir = make_tmp_dir()
+        self.addCleanup(os.rmdir, self.wdir)
+        fname = os.path.abspath(os.path.join(self.wdir, "test.root"))
         create_test_tree(
             filename=fname,
             treename=self.treename,

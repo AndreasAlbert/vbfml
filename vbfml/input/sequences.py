@@ -56,7 +56,7 @@ class MultiDatasetSequence(Sequence):
 
     def __len__(self) -> int:
         read_fraction = self.read_range[1] - self.read_range[0]
-        return int(self.total_events() * read_fraction // self.batch_size)
+        return int(np.ceil(self.total_events() * read_fraction / self.batch_size))
 
     @property
     def weight_expression(self) -> str:
@@ -176,7 +176,12 @@ class MultiDatasetSequence(Sequence):
         start = offset + np.floor(
             batch_start * self.batch_size * self.fractions[dataset_name]
         )
-        stop = np.floor(batch_stop * self.batch_size * self.fractions[dataset_name]) - 1
+
+        n_batches = batch_stop - batch_start
+        stop = np.floor(
+            start + n_batches * self.batch_size * self.fractions[dataset_name]
+        )
+        stop = min(stop, int(self.read_range[1] * dataset_events))
         return start, stop
 
     def dataset_labels(self) -> "list[str]":
@@ -223,7 +228,7 @@ class MultiDatasetSequence(Sequence):
         if self.scale_features and not self._feature_scaler:
             self._init_feature_scaler_from_multibatch(multibatch_df)
         if self.shuffle:
-            multibatch_df = multibatch_df.sample(frac=1)
+            multibatch_df = multibatch_df.sample(frac=1, ignore_index=True)
         self.buffer.set_multibatch(multibatch_df, batch_start)
 
     def _batch_df_formatting(self, df: pd.DataFrame) -> "tuple[np.ndarray]":

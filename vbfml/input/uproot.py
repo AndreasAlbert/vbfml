@@ -87,12 +87,15 @@ class UprootReaderMultiFile:
         Read and return event data, possibly across file boundaries.
         """
         file_index_start, local_event_index_start = self._index_into_file(start)
-        file_index_stop, local_event_index_stop = self._index_into_file(stop)
-
         assert file_index_start is not None
-        assert file_index_stop is not None
         assert local_event_index_start is not None
-        assert local_event_index_stop is not None
+
+        # If more events are requested than exist, read until the end
+        file_index_stop, local_event_index_stop = self._index_into_file(stop)
+        if file_index_stop is None:
+            file_index_stop = self.n_files - 1
+            local_event_index_stop = self.nevents_per_file[file_index_stop]
+
         dataframes = []
         for file_index in range(file_index_start, file_index_stop + 1):
             # Read from start except in first file

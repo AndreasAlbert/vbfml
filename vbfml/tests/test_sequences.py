@@ -4,9 +4,10 @@ from unittest import TestCase
 
 import numpy as np
 from tensorflow.keras.utils import to_categorical
+
 from vbfml.input.sequences import DatasetInfo, MultiDatasetSequence
-from vbfml.tests.util import create_test_tree, make_tmp_dir
 from vbfml.models import sequential_dense_model
+from vbfml.tests.util import create_test_tree, make_tmp_dir
 
 
 class TestMultiDatasetSequence(TestCase):
@@ -224,6 +225,7 @@ class TestMultiDatasetSequenceSplit(TestCase):
         self.mds.add_dataset(dataset)
 
     def _test_read_range(self, read_range):
+        """Helper to for read range test: Test single range."""
         self.mds.read_range = read_range
 
         def in_range(x):
@@ -233,14 +235,32 @@ class TestMultiDatasetSequenceSplit(TestCase):
 
         valid_values = set(filter(in_range, self.values))
 
+        self.assertTrue(len(self.mds) > 0)
         for features, _ in self.mds:
             all_valid = all([x in valid_values for x in features.flatten()])
-            self.assertTrue(all_valid)
+            self.assertTrue(all_valid, msg=f"Failed for read_range: {read_range}")
 
     def test_read_range(self):
-        ranges = [(0.1, 0.9), (0.25, 0.75), (0.3, 1.0), (0.0, 0.7)]
+        """Test that the correct values are read for various reading ranges"""
+        ranges = [(0.1, 0.9), (0.25, 0.75), (0.3, 1.0), (0.0, 0.7), (0.8, 1.0)]
         for irange in ranges:
             self._test_read_range(irange)
+
+    def test_buffer_fill_with_read_range(self):
+        """
+        Test that buffer is filled correctly when read_range is used.
+        """
+        # Sanity: check that it works without read range
+        self.assertFalse(0 in self.mds.buffer)
+        self.mds._fill_batch_buffer(0, len(self.mds))
+        self.assertTrue(0 in self.mds.buffer)
+        self.mds.buffer.clear()
+
+        # Check with small read range
+        self.mds.read_range = (0.9, 1.0)
+        self.assertFalse(0 in self.mds.buffer)
+        self.mds._fill_batch_buffer(0, len(self.mds))
+        self.assertTrue(0 in self.mds.buffer)
 
 
 class TestMultiDatasetSequenceWeight(TestCase):

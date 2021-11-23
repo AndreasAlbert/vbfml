@@ -1,11 +1,15 @@
 architecture: conv
 training_parameters:
   batch_size: 10
-  batch_buffer_size: 100
+  batch_buffer_size: 1000
+  scale_features: norm
+  shuffle: true
   train_size: 0.67
 validation_parameters:
-  batch_size: 100
+  batch_size: 1000
   batch_buffer_size: 10
+  scale_features: norm
+  shuffle: true
 weight_expression: Normalization
 features:
 - JetImage_pixels

@@ -11,6 +11,8 @@ def build_sequence(
     features: "list[str]",
     weight_expression: str = "weight_total*xs/sumw",
     absolute_weight: bool = False,
+    shuffle: bool = True,
+    scale_features: str = "standard",
 ) -> MultiDatasetSequence:
     """Shortcut to set up a MultiDatasetSequence"""
 
@@ -20,9 +22,10 @@ def build_sequence(
     sequence = MultiDatasetSequence(
         batch_size=50,
         branches=features,
-        shuffle=True,
+        shuffle=shuffle,
         batch_buffer_size=int(1e5),
         weight_expression=weight_expression,
+        scale_features=scale_features,
     )
 
     for dataset in datasets:

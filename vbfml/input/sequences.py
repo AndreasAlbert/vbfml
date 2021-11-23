@@ -27,6 +27,24 @@ def row_vector(branch):
     return np.array(branch).reshape((len(branch), 1))
 
 
+class Normalizer:
+    def __init__(self) -> None:
+        pass
+
+    def fit(self, features: np.ndarray):
+        return self
+
+    def transform(self, features: np.ndarray, ceiling: float = 255.0):
+        """Simple normalizer for image data. Divides all values with 255
+        to get all values within [0,1] range.
+
+        Args:
+            features (np.ndarray): Image pixels.
+            ceiling (float, optional): The highest pixel value. Defaults to 255.
+        """
+        return features / ceiling
+
+
 class MultiDatasetSequence(Sequence):
     def __init__(
         self,
@@ -36,7 +54,7 @@ class MultiDatasetSequence(Sequence):
         batch_buffer_size=1,
         read_range=(0.0, 1.0),
         weight_expression=None,
-        scale_features=False,
+        scale_features="none",
     ) -> None:
         self.datasets = {}
         self.readers = {}
@@ -76,11 +94,11 @@ class MultiDatasetSequence(Sequence):
         self._batch_size = batch_size
 
     @property
-    def scale_features(self) -> bool:
+    def scale_features(self) -> str:
         return self._scale_features
 
     @scale_features.setter
-    def scale_features(self, scale_features: bool) -> None:
+    def scale_features(self, scale_features: str) -> None:
         if scale_features != self.scale_features:
             self.buffer.clear()
         self._scale_features = scale_features
@@ -118,7 +136,8 @@ class MultiDatasetSequence(Sequence):
         """
         Initialize the feature scaler object based on a feature tensor.
         """
-        self._feature_scaler = StandardScaler().fit(features)
+        scalers = {"standard": StandardScaler, "norm": Normalizer}
+        self._feature_scaler = scalers[self._scale_features]().fit(features)
 
     def _init_feature_scaler_from_multibatch(self, df: "pd.DataFrame") -> None:
         """
@@ -237,7 +256,7 @@ class MultiDatasetSequence(Sequence):
         Read batches from file and save them into the buffer for future use.
         """
         multibatch_df = self._read_multibatch(batch_start, batch_stop)
-        if self.scale_features and not self._feature_scaler:
+        if self.scale_features != "none" and not self._feature_scaler:
             self._init_feature_scaler_from_multibatch(multibatch_df)
         if self.shuffle:
             multibatch_df = multibatch_df.sample(frac=1, ignore_index=True)
@@ -248,8 +267,15 @@ class MultiDatasetSequence(Sequence):
 
         features = df.drop(columns=self._non_feature_columns()).to_numpy()
         features = features.astype(self._float_dtype)
-        if self.scale_features:
+        if self.scale_features != "none":
             features = self.apply_feature_scaling(features)
+
+        # Double checking the feature range here
+        if self.scale_features == "norm":
+            valid = np.all((features >= 0) & (features <= 1))
+            assert (
+                valid
+            ), "Features are not scaled correctly to [0,1] range, please check!"
 
         labels = to_categorical(
             row_vector(df["label"]),

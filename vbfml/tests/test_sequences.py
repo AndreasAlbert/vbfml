@@ -424,23 +424,71 @@ class TestMultiDatasetSequenceFeatureScaling(TestCase):
             """
             Mean is supposed to be ~=0, std dev ~=1
             -> Calculate and return the absolute differences
+            IMPORTANT: Note that this is relevant only for "standard" scaling!
             """
             deviation_mean = np.max(np.abs(np.mean(features, axis=0)))
             deviation_std = np.max(np.abs(np.std(features, axis=0) - 1))
             return deviation_mean, deviation_std
 
         # Read without feature scaling
-        self.mds.scale_features = False
+        self.mds.scale_features = "none"
         features, _, weights = self.mds[0]
         dev_mean, dev_std = deviation_from_target(features)
         self.assertNotAlmostEqual(dev_mean, self.feature_mean)
         self.assertNotAlmostEqual(dev_std, self.feature_std - 1)
         self.assertTrue(np.allclose(np.abs(features), weights, rtol=0.01))
 
-        # Read with feature scaling
-        self.mds.scale_features = True
+        # Read with standard feature scaling
+        self.mds.scale_features = "standard"
         features, _, weights = self.mds[0]
         dev_mean, dev_std = deviation_from_target(features)
         self.assertAlmostEqual(dev_mean, 0, places=2)
         self.assertAlmostEqual(dev_std, 0, places=2)
         self.assertTrue(np.all(features != weights))
+
+
+class TestMultiDatasetSequenceNormFeatureScaling(TestCase):
+    def setUp(self):
+        self.treename = "tree"
+        self.feature_branches = ["a"]
+        self.nevents_per_file = int(1e4)
+        # Generate data that resembles the real image data
+        # i.e. has a range of [0,255]
+        self.values = np.random.randint(low=0, high=255, size=self.nevents_per_file)
+
+        self.mds = MultiDatasetSequence(
+            batch_size=int(1e3), branches=self.feature_branches, shuffle=False
+        )
+
+        self.wdir = make_tmp_dir()
+        self.addCleanup(os.rmdir, self.wdir)
+        fname = os.path.abspath(os.path.join(self.wdir, "test.root"))
+
+        create_test_tree(
+            filename=fname,
+            treename=self.treename,
+            branches=self.feature_branches,
+            n_events=self.nevents_per_file,
+            value=self.values,
+        )
+        self.addCleanup(os.remove, fname)
+
+        dataset = DatasetInfo(
+            name="dataset",
+            files=[fname],
+            n_events=self.nevents_per_file,
+            treename=self.treename,
+        )
+        self.mds.add_dataset(dataset)
+
+    def test_feature_scaling_with_norm(self):
+        """
+        Test "norm" feature scaling. After the feature scaling, all values
+        should be in a range of [0,1].
+        """
+        self.mds.scale_features = "norm"
+        features, _ = self.mds[0]
+        f_min, f_max = np.min(features), np.max(features)
+        self.assertTrue(f_min < f_max)
+        self.assertTrue(f_min >= 0)
+        self.assertTrue(f_max <= 1)

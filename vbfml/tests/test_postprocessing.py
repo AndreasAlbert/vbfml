@@ -78,7 +78,7 @@ class TestTrainingAnalysisAndPlot(TestCase):
 
         datasets = load_datasets_bucoffea(self.wdir)
         sequence = build_sequence(datasets, features=self.features)
-        sequence.scale_features = True
+        sequence.scale_features = "standard"
         self.training_sequence = sequence
         self.validation_sequence = copy.deepcopy(sequence)
 

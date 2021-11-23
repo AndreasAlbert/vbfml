@@ -83,33 +83,36 @@ def setup(ctx, learning_rate: float, dropout: float, input_dir: str, model_confi
 
     features = mconfig.get("features")
 
+    training_params = mconfig.get("training_parameters")
+    validation_params = mconfig.get("validation_parameters")
+
     training_sequence = build_sequence(
         datasets=copy.deepcopy(datasets),
         features=features,
         weight_expression=mconfig.get("weight_expression"),
+        shuffle=training_params["shuffle"],
+        scale_features=training_params["scale_features"],
     )
     validation_sequence = build_sequence(
         datasets=copy.deepcopy(datasets),
         features=features,
         weight_expression=mconfig.get("weight_expression"),
+        shuffle=validation_params["shuffle"],
+        scale_features=validation_params["scale_features"],
     )
     normalize_classes(training_sequence)
     normalize_classes(validation_sequence)
 
     # Training sequence
-    training_params = mconfig.get("training_parameters")
     train_size = training_params["train_size"]
 
     training_sequence.read_range = (0.0, train_size)
-    training_sequence.scale_features = True
     training_sequence.batch_size = training_params["batch_size"]
     training_sequence.batch_buffer_size = training_params["batch_buffer_size"]
     training_sequence[0]
 
     # Validation sequence
-    validation_params = mconfig.get("validation_parameters")
     validation_sequence.read_range = (train_size, 1.0)
-    validation_sequence.scale_features = True
     validation_sequence._feature_scaler = copy.deepcopy(
         training_sequence._feature_scaler
     )

@@ -104,7 +104,7 @@ class TrainingAnalyzer:
         histograms = {}
         for sequence_type in ["training", "validation"]:
             sequence = self.loader.get_sequence(sequence_type)
-            sequence.scale_features = False
+            sequence.scale_features = "none"
             sequence.batch_size = int(1e6)
             sequence.batch_buffer_size = 10
             (

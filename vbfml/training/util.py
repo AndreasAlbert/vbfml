@@ -70,12 +70,12 @@ def get_weight_integral_by_label(sequence: MultiDatasetSequence) -> Dict[str, fl
     return integrals
 
 
-def normalize_classes(sequence: MultiDatasetSequence) -> None:
+def normalize_classes(sequence: MultiDatasetSequence, target_integral: float) -> None:
     """Changes data set weights in-place so that all classes have same integral."""
     label_to_weight_dict = get_weight_integral_by_label(sequence)
     for dataset_obj in sequence.datasets.values():
         weight = label_to_weight_dict[dataset_obj.label]
-        dataset_obj.weight = dataset_obj.weight / weight
+        dataset_obj.weight = target_integral * dataset_obj.weight / weight
 
 
 def generate_callbacks_for_profiling() -> None:

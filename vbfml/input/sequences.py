@@ -169,6 +169,7 @@ class MultiDatasetSequence(Sequence):
 
     def _read_multibatch(self, batch_start: int, batch_stop: int) -> pd.DataFrame:
         dfs = self._read_dataframes_for_batch_range(batch_start, batch_stop)
+        assert len(dfs) > 0, f"No dataframes were read with batch_start, batch_stop = ({batch_start}, {batch_stop})."
         return pd.concat(dfs, ignore_index=True)
 
     def _read_single_dataframe_for_batch_range(

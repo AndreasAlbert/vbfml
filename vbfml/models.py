@@ -36,13 +36,7 @@ def sequential_dense_model(
         len(n_nodes) == n_layers
     ), "Inconsistent number of layers and node specification!"
 
-    model.add(
-        Dense(
-            n_nodes[0],
-            input_dim=n_features,
-            activation="relu",
-        )
-    )
+    model.add(Dense(n_nodes[0], input_dim=n_features))
 
     for ilayer in range(1, n_layers):
         if dropout:

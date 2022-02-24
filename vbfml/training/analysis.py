@@ -61,7 +61,7 @@ class TrainingAnalyzer:
     data: "dict" = field(default_factory=dict)
 
     def __post_init__(self):
-        self.loader = TrainingLoader(self.directory)
+        self.loader = TrainingLoader(self.directory, framework="pytorch")
         self.cache = os.path.join(self.directory, os.path.basename(self.cache))
 
     def _make_histogram(self, quantity_name: str) -> hist.Hist:
@@ -232,7 +232,6 @@ class TrainingAnalyzer:
         ):
             features, labels_onehot, weights = sequence[ibatch]
             labels = labels_onehot.argmax(axis=1)
-
             scores = model.predict(feature_scaler.transform(features))
             if sequence_type == "validation":
                 predicted_scores.append(scores)
